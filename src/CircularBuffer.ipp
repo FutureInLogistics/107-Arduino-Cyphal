@@ -18,7 +18,7 @@ namespace cyphal
 
 template <typename T>
 CircularBuffer<T>::CircularBuffer(size_t const heap_size)
-: _buffer{new T[heap_size]}
+: _buffer(heap_size)
 , _size{heap_size}
 , _head{0}
 , _tail{0}
@@ -45,7 +45,7 @@ void CircularBuffer<T>::enqueue(T const & val)
 {
   if (isFull()) return;
 
-  _buffer.get()[_head] = val;
+  _buffer[_head] = val;
   _head = nextIndex(_head);
   _num_elems++;
 }
@@ -55,7 +55,7 @@ T * CircularBuffer<T>::peek()
 {
   if (isEmpty()) return nullptr;
 
-  T * val_ptr = &(_buffer.get()[_tail]);
+  T * val_ptr = &(_buffer[_tail]);
   return val_ptr;
 }
 
