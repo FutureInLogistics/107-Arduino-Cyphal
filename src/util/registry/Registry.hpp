@@ -102,7 +102,7 @@ private:
     /* Prepare the response for this access request. */
     return TAccessResponse
       {
-        _micros(),
+        {_micros()},
         reg_with_metadata.value().flags.mutable_,
         reg_with_metadata.value().flags.persistent,
         reg_with_metadata.value().value

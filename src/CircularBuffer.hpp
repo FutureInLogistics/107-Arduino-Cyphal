@@ -53,7 +53,7 @@ public:
 
 
 private:
-  std::unique_ptr<T> _buffer;
+  std::vector<T> _buffer;
   size_t _size, _head, _tail, _num_elems;
 
   bool isFull() const { return (_num_elems == _size); }
