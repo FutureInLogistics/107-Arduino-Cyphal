@@ -223,6 +223,21 @@ SocketCANFD socketcanOpen(const char* const iface_name, const bool can_fd,
         setsockopt(fd, SOL_CAN_RAW, CAN_RAW_FILTER, NULL, 0);
     }
 
+    // Enable RX queue overflow reporting so callers can detect silent per-socket drops via SO_RXQ_OVFL.
+    // These drops do NOT appear in interface-level stats (ip -s link show) — only in the ancillary data
+    // returned by recvmsg() on this socket.
+    if (ok) {
+        const int enable = 1;
+        (void) setsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &enable, sizeof(enable));
+    }
+
+    // Increase receive buffer to handle bursts when the receiver thread is delayed by CPU scheduling.
+    // The kernel default (net.core.rmem_default, typically 212 KB) may be insufficient under high CPU load.
+    if (ok && enable_frame_reception) {
+        int rcvbuf = 1048576;  // 1 MB
+        (void) setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+    }
+
     // Enable timestamping.
     if (ok) {
         unsigned int ts_flags =
@@ -294,7 +309,8 @@ int16_t socketcanPop(const SocketCANFD        fd,
                      const size_t             payload_buffer_size,
                      void* const              payload_buffer,
                      const CanardMicrosecond  timeout_usec,
-                     bool* const              loopback)
+                     bool* const              loopback,
+                     uint32_t* const          out_drops)
 {
     if ((out_frame == NULL) || (payload_buffer == NULL))
     {
@@ -316,11 +332,12 @@ int16_t socketcanPop(const SocketCANFD        fd,
         };
 
         // Determine the size of the ancillary data and zero-initialize the buffer for it.
-        // We require space for both the receive message header (implied in CMSG_SPACE) and the time stamp.
+        // We require space for the receive message header (implied in CMSG_SPACE), the time stamp,
+        // and the SO_RXQ_OVFL drop counter.
         // The ancillary data buffer is wrapped in a union to ensure it is suitably aligned.
         // See the cmsg(3) man page (release 5.08 dated 2020-06-09, or later) for details.
         union {
-          uint8_t buf[CMSG_SPACE(sizeof(struct timespec[3]))];
+          uint8_t buf[CMSG_SPACE(sizeof(struct timespec[3])) + CMSG_SPACE(sizeof(uint32_t))];
           struct cmsghdr align;
         } control;
         (void)memset(control.buf, 0, sizeof(control.buf));
@@ -392,6 +409,18 @@ int16_t socketcanPop(const SocketCANFD        fd,
                 }
             }
             *out_timestamp_usec = (CanardMicrosecond)(software_timestamp_ns / KILO);
+        }
+
+        // Extract the per-socket RX queue overflow (drop) counter from ancillary data.
+        // This counter is only present when SO_RXQ_OVFL was enabled on the socket.
+        // It is cumulative — increases monotonically with each dropped frame.
+        if (out_drops != NULL) {
+            for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+                if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_RXQ_OVFL) {
+                    (void) memcpy(out_drops, CMSG_DATA(cmsg), sizeof(uint32_t));
+                    break;
+                }
+            }
         }
 
         out_frame->extended_can_id = sockcan_frame.can_id & CAN_EFF_MASK;

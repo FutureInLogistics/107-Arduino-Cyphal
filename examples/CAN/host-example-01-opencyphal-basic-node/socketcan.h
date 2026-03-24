@@ -90,6 +90,9 @@ int16_t socketcanPush(const SocketCANFD fd, const CanardFrame* const frame, cons
  * @param[in,out] loopback The loopback flag pointer is used to both indicate and control behavior when a
  * looped-back message is received. If the flag pointer is NULL, loopback frames are silently dropped; if not
  * NULL, they are accepted and indicated using this flag.
+ * @param[out] out_drops Cumulative per-socket RX queue overflow counter (SO_RXQ_OVFL). Increases monotonically
+ * each time the kernel drops a frame because this socket's receive buffer is full. These drops are invisible
+ * to interface-level stats (ip -s link show). Pass NULL to ignore.
  *
  * @return 1 on success, 0 on timeout, negated errno on error.
  */
@@ -99,7 +102,8 @@ int16_t socketcanPop(const SocketCANFD        fd,
                      const size_t             payload_buffer_size,
                      void* const              payload_buffer,
                      const CanardMicrosecond  timeout_usec,
-                     bool* const              loopback);
+                     bool* const              loopback,
+                     uint32_t* const          out_drops);
 
 /**
  * @brief Fetch one new TX timestamp notification from the errqueue.
