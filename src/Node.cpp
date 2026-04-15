@@ -166,18 +166,20 @@ void Node::processRxQueue()
   if (_mtu_bytes == CANARD_MTU_CAN_CLASSIC)
   {
     CircularBufferCan * can_rx_queue_ptr = static_cast<CircularBufferCan *>(_canard_rx_queue.get());
-    CanRxQueueItem<CANARD_MTU_CAN_CLASSIC> const * rx_queue_item = can_rx_queue_ptr->peek();
-    if (!rx_queue_item) return;
-    processRxFrame(rx_queue_item);
-    can_rx_queue_ptr->pop();
+    while (CanRxQueueItem<CANARD_MTU_CAN_CLASSIC> const * rx_queue_item = can_rx_queue_ptr->peek())
+    {
+      processRxFrame(rx_queue_item);
+      can_rx_queue_ptr->pop();
+    }
   }
   else if (_mtu_bytes == CANARD_MTU_CAN_FD)
   {
     CircularBufferCanFd * canfd_rx_queue_ptr = static_cast<CircularBufferCanFd *>(_canard_rx_queue.get());
-    CanRxQueueItem<CANARD_MTU_CAN_FD> const * rx_queue_item = canfd_rx_queue_ptr->peek();
-    if (!rx_queue_item) return;
-    processRxFrame(rx_queue_item);
-    canfd_rx_queue_ptr->pop();
+    while (CanRxQueueItem<CANARD_MTU_CAN_FD> const * rx_queue_item = canfd_rx_queue_ptr->peek())
+    {
+      processRxFrame(rx_queue_item);
+      canfd_rx_queue_ptr->pop();
+    }
   }
 }
 
