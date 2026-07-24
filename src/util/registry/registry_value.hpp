@@ -205,10 +205,10 @@ template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
 /// If the destination is a string or unstructured, its length is set to that of the source.
 /// Otherwise, the length of the destination is not modified, and the source is truncated if necessary;
 /// if the source is shorter, the last elements of the destination are left unmodified.
-inline bool coerce(Value& destination, const Value& source)
-{
-    return visit(detail::Coercer(), destination.union_value, source.union_value);
-}
+/// Defined out-of-line (registry_value.cpp): the underlying two-variant std::visit instantiation is
+/// expensive to compile, and defining it here made every translation unit that includes the registry
+/// headers pay for it.
+bool coerce(Value& destination, const Value& source);
 
 // ==================================================  GET/SET  ==================================================
 
